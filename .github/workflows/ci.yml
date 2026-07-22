@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: tuturno_admin
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      NODE_ENV: test
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_ADMIN_NAME: tuturno_admin
+      JWT_SECRET: ci-jwt-secret-min-32-characters!!
+      JWT_REFRESH_SECRET: ci-refresh-secret-min-32-chars!!
+      SUPER_JWT_SECRET: ci-super-jwt-secret-min-32-chars!
+      SUPER_JWT_REFRESH_SECRET: ci-super-refresh-min-32-chars!!
+      RESERVATION_TOKEN_SECRET: ci-reservation-token-secret!!!
+      LEGACY_API_ENABLED: 'true'
+      RUN_CRONS_IN_API: 'false'
+      REQUIRE_RESERVATION_SIG: 'false'
+      ALLOW_INSECURE_MP_WEBHOOK: 'true'
+      CI_SKIP_DB: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Type-check
+        run: npm run type-check
+      - name: Build backend
+        run: npm run build -w backend
+      - name: Setup admin schema
+        run: npm run setup:admin -w backend
+      - name: Seed super + tenants
+        run: |
+          npm run seed:super -w backend
+          npm run seed:tenants -w backend
+      - name: Migrate
+        run: npm run migrate -w backend -- apply
+      - name: Unit + integration + http
+        run: |
+          npm run seed:refresh-demo -w backend
+          npm run test -w backend
+      - name: Audit (informational)
+        run: npm run audit:prod || true
+
+  frontends:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
+      - name: Build frontends
+        run: |
+          npm run build -w frontend
+          npm run build -w panel
+          npm run build -w panel-super
+        env:
+          NEXT_PUBLIC_API_URL: http://api.localhost:4013
+          NEXT_PUBLIC_PANEL_URL: http://panel.localhost:4011
+          NEXT_PUBLIC_APP_URL: http://panel.localhost:4011
+          NEXT_PUBLIC_BASE_DOMAIN: localhost

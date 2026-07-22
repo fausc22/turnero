@@ -14,13 +14,11 @@ export function getSuperRefreshToken(): string | null {
 export function setSuperTokens(token: string, refreshToken: string): void {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(REFRESH_KEY, refreshToken);
+  document.cookie = `super_token=${token}; path=/; max-age=28800; SameSite=Lax`;
 }
 
 export function clearSuperTokens(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_KEY);
-}
-
-export function isSuperAuthenticated(): boolean {
-  return !!getSuperToken();
+  document.cookie = 'super_token=; path=/; max-age=0';
 }

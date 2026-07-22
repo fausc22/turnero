@@ -164,6 +164,7 @@ CREATE TABLE IF NOT EXISTS `turnos` (
   UNIQUE KEY `uq_idempotency_key` (`idempotency_key`),
   KEY `idx_fecha_inicio` (`fecha_inicio`),
   KEY `idx_estado` (`estado`),
+  KEY `idx_turnos_overlap` (`estado`, `profesional_id`, `fecha_inicio`, `fecha_fin`),
   CONSTRAINT `fk_turno_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_turno_profesional` FOREIGN KEY (`profesional_id`) REFERENCES `profesionales` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -21,12 +21,18 @@ const FIELD_MAP: Record<MediaType, 'logo_path' | 'favicon_path' | 'hero_path'> =
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
+function uploadsRoot(): string {
+  return process.env.UPLOADS_PATH || path.join(process.cwd(), 'uploads');
+}
+
 function tenantUploadDir(tenantId: number): string {
-  return path.join(process.cwd(), 'uploads', 'tenants', String(tenantId));
+  return path.join(uploadsRoot(), 'tenants', String(tenantId));
 }
 
 async function processImage(type: MediaType, buffer: Buffer): Promise<Buffer> {
-  const img = sharp(buffer);
+  // sharp metadata validates real image bytes (rejects non-images)
+  const img = sharp(buffer, { failOn: 'error' });
+  await img.metadata();
   if (type === 'logo') {
     return img.resize(400, 400, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 85 }).toBuffer();
   }
@@ -53,10 +59,18 @@ export async function uploadTenantMedia(
   const dir = tenantUploadDir(ctx.tenantId);
   fs.mkdirSync(dir, { recursive: true });
 
-  const processed = await processImage(type, file.buffer);
+  let processed: Buffer;
+  try {
+    processed = await processImage(type, file.buffer);
+  } catch {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Archivo de imagen inválido');
+  }
+
   const filename = `${type}.webp`;
   const absPath = path.join(dir, filename);
-  fs.writeFileSync(absPath, processed);
+  const tmpPath = path.join(dir, `.${filename}.${process.pid}.tmp`);
+  fs.writeFileSync(tmpPath, processed);
+  fs.renameSync(tmpPath, absPath);
 
   const relPath = `tenants/${ctx.tenantId}/${filename}`;
   await metaRepo.updateEstiloPath(FIELD_MAP[type], relPath);
@@ -66,6 +80,10 @@ export async function uploadTenantMedia(
 
 export function resolveAssetAbsolutePath(relPath: string | null): string | null {
   if (!relPath) return null;
-  const abs = path.join(process.cwd(), 'uploads', relPath);
+  // Prevent path traversal
+  const normalized = path.normalize(relPath).replace(/^(\.\.(\/|\\|$))+/, '');
+  if (normalized.includes('..')) return null;
+  const abs = path.join(uploadsRoot(), normalized);
+  if (!abs.startsWith(path.resolve(uploadsRoot()))) return null;
   return fs.existsSync(abs) ? abs : null;
 }

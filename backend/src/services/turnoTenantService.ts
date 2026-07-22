@@ -54,70 +54,90 @@ export async function createReserva(
     }
   }
 
-  const overlapping = await turnoRepo.findOverlappingForUpdate(
-    input.fechaInicio,
-    input.fechaFin,
-    input.profesionalId,
-    conn
+  // Serialize concurrent bookings for the same professional+start (gap-safe when FOR UPDATE returns 0 rows)
+  const lockKey = `turno:${input.profesionalId ?? 'any'}:${input.fechaInicio.toISOString()}`;
+  const [lockRows] = await conn.query<{ got: number }[] & import('mysql2').RowDataPacket[]>(
+    `SELECT GET_LOCK(?, 10) AS got`,
+    [lockKey.slice(0, 64)]
   );
-
-  for (const t of overlapping) {
-    if (overlaps(input.fechaInicio, input.fechaFin, new Date(t.fecha_inicio), new Date(t.fecha_fin))) {
-      throw new AppError(409, 'SLOT_TAKEN', 'El horario seleccionado ya no está disponible');
-    }
+  if (!lockRows[0] || Number((lockRows[0] as { got: number }).got) !== 1) {
+    throw new AppError(409, 'SLOT_TAKEN', 'El horario seleccionado ya no está disponible');
   }
 
-  const servicios = await servicioRepo.findByIds(input.servicioIds, conn);
-  if (servicios.length !== input.servicioIds.length) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Servicios inválidos');
-  }
-
-  let precioTotal = servicios.reduce((sum, s) => sum + Number(s.precio), 0);
-  const productoLines: { productoId: number; cantidad: number; precio: number }[] = [];
-
-  if (input.productos?.length) {
-    for (const p of input.productos) {
-      const prod = await productoRepo.findById(p.productoId, conn);
-      if (!prod || prod.stock_actual < p.cantidad) {
-        throw new AppError(409, 'STOCK_INSUFICIENTE', 'Stock insuficiente para un producto');
-      }
-      precioTotal += Number(prod.precio) * p.cantidad;
-      productoLines.push({ productoId: p.productoId, cantidad: p.cantidad, precio: Number(prod.precio) });
-    }
-  }
-
-  const estado = input.estadoOverride ?? initialEstado(politicas.modo_pago);
-  const tokenGestion = generateTokenGestion();
-
-  const turnoId = await turnoRepo.createTurno(
-    {
-      clienteId: input.clienteId,
-      profesionalId: input.profesionalId,
-      fechaInicio: input.fechaInicio,
-      fechaFin: input.fechaFin,
-      estado,
-      precioTotal,
-      notasCliente: input.notas,
-      tokenGestion,
-      idempotencyKey: input.idempotencyKey,
-    },
-    conn
-  );
-
-  await turnoRepo.addServicios(
-    turnoId,
-    servicios.map((s) => ({ servicioId: s.id, precio: Number(s.precio) })),
-    conn
-  );
-
-  for (const line of productoLines) {
-    await productoRepo.decrementStock(line.productoId, line.cantidad, conn);
-    await turnoRepo.addProductos(
-      turnoId,
-      [{ productoId: line.productoId, cantidad: line.cantidad, precio: line.precio }],
+  try {
+    const overlapping = await turnoRepo.findOverlappingForUpdate(
+      input.fechaInicio,
+      input.fechaFin,
+      input.profesionalId,
       conn
     );
-  }
 
-  return { turnoId, tokenGestion, estado, precioTotal };
+    for (const t of overlapping) {
+      if (
+        overlaps(input.fechaInicio, input.fechaFin, new Date(t.fecha_inicio), new Date(t.fecha_fin))
+      ) {
+        throw new AppError(409, 'SLOT_TAKEN', 'El horario seleccionado ya no está disponible');
+      }
+    }
+
+    const servicios = await servicioRepo.findByIds(input.servicioIds, conn);
+    if (servicios.length !== input.servicioIds.length) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Servicios inválidos');
+    }
+
+    let precioTotal = servicios.reduce((sum, s) => sum + Number(s.precio), 0);
+    const productoLines: { productoId: number; cantidad: number; precio: number }[] = [];
+
+    if (input.productos?.length) {
+      for (const p of input.productos) {
+        const prod = await productoRepo.findById(p.productoId, conn, { forUpdate: true });
+        if (!prod || prod.stock_actual < p.cantidad) {
+          throw new AppError(409, 'STOCK_INSUFICIENTE', 'Stock insuficiente para un producto');
+        }
+        precioTotal += Number(prod.precio) * p.cantidad;
+        productoLines.push({
+          productoId: p.productoId,
+          cantidad: p.cantidad,
+          precio: Number(prod.precio),
+        });
+      }
+    }
+
+    const estado = input.estadoOverride ?? initialEstado(politicas.modo_pago);
+    const tokenGestion = generateTokenGestion();
+
+    const turnoId = await turnoRepo.createTurno(
+      {
+        clienteId: input.clienteId,
+        profesionalId: input.profesionalId,
+        fechaInicio: input.fechaInicio,
+        fechaFin: input.fechaFin,
+        estado,
+        precioTotal,
+        notasCliente: input.notas,
+        tokenGestion,
+        idempotencyKey: input.idempotencyKey,
+      },
+      conn
+    );
+
+    await turnoRepo.addServicios(
+      turnoId,
+      servicios.map((s) => ({ servicioId: s.id, precio: Number(s.precio) })),
+      conn
+    );
+
+    for (const line of productoLines) {
+      await productoRepo.decrementStock(line.productoId, line.cantidad, conn);
+      await turnoRepo.addProductos(
+        turnoId,
+        [{ productoId: line.productoId, cantidad: line.cantidad, precio: line.precio }],
+        conn
+      );
+    }
+
+    return { turnoId, tokenGestion, estado, precioTotal };
+  } finally {
+    await conn.query(`SELECT RELEASE_LOCK(?)`, [lockKey.slice(0, 64)]);
+  }
 }

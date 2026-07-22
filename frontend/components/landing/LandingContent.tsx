@@ -7,9 +7,16 @@ import { useTenant } from '@/context/TenantContext';
 import { useServicios } from '@/hooks/public/usePublicQueries';
 import { copy } from '@/lib/copy';
 import { formatDuracion, formatPrecio } from '@/lib/format';
+import { getTenantSlug } from '@/lib/tenant-client';
 import type { ServicioPublico } from '@/types/public';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://api.localhost:4013';
+
+function assetUrl(type: 'logo' | 'hero'): string {
+  const slug = getTenantSlug();
+  const q = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  return `${API_URL}/api/public/asset/${type}${q}`;
+}
 
 function topServicios(servicios: ServicioPublico[]): ServicioPublico[] {
   return [...servicios].sort((a, b) => a.orden - b.orden).slice(0, 4);
@@ -23,8 +30,8 @@ export function LandingContent() {
 
   const allServicios = categorias?.flatMap((c) => c.servicios) ?? [];
   const destacados = topServicios(allServicios);
-  const heroUrl = `${API_URL}/api/public/asset/hero`;
-  const logoUrl = `${API_URL}/api/public/asset/logo`;
+  const heroUrl = assetUrl('hero');
+  const logoUrl = assetUrl('logo');
   const pausada = config?.pageStatus === 'PAUSADA';
   const mapsUrl =
     config?.direccionLat != null && config?.direccionLng != null

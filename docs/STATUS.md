@@ -147,7 +147,8 @@
 | 7 | Personalización + stats | HECHO |
 | 8 | Roles + features avanzados | HECHO |
 | 9 | Testing | HECHO |
-| 10 | Pulido + QA local | PENDIENTE |
+| 10 | Pulido + QA local / cierre productivo | EN_CURSO |
+| 10+ | Staging + piloto controlado | PENDIENTE (runbooks listos) |
 
 ---
 

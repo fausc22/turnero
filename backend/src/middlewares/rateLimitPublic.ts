@@ -8,6 +8,11 @@ export const rateLimitPublic = rateLimit({
   max,
   standardHeaders: true,
   legacyHeaders: false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  keyGenerator: (req: any) => {
+    const slug = String(req.headers?.['x-tenant-slug'] || '').toLowerCase();
+    return `${req.ip || 'unknown'}:${slug}`;
+  },
   message: {
     error: {
       code: 'RATE_LIMIT_EXCEEDED',

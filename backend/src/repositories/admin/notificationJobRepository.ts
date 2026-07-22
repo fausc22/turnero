@@ -54,7 +54,7 @@ export async function enqueue(job: EnqueueJobInput): Promise<number> {
   return result.insertId;
 }
 
-export async function claimNext(batch = 1): Promise<NotificationJobRow[]> {
+export async function claimNext(batch = 1, workerId?: string): Promise<NotificationJobRow[]> {
   const connection = await import('../../config/adminDatabase').then((m) => m.getAdminConnection());
   try {
     await connection.beginTransaction();
@@ -76,8 +76,10 @@ export async function claimNext(batch = 1): Promise<NotificationJobRow[]> {
 
     const ids = rows.map((r) => r.id);
     await connection.execute(
-      `UPDATE notification_jobs SET status = 'processing' WHERE id IN (${ids.map(() => '?').join(',')})`,
-      ids
+      `UPDATE notification_jobs
+       SET status = 'processing', claimed_at = NOW(), worker_id = ?
+       WHERE id IN (${ids.map(() => '?').join(',')})`,
+      [workerId ?? null, ...ids]
     );
 
     await connection.commit();

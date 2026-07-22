@@ -83,6 +83,16 @@ export class TenantAuthService {
     if (!tenant || !tenant.db_name) {
       throw new NotFoundError('Tenant');
     }
+    if (tenant.status !== 'activo') {
+      throw new UnauthorizedError('Tenant no disponible', 'TENANT_NOT_AVAILABLE');
+    }
+    if (
+      tenant.plan === 'trial' &&
+      tenant.trial_ends_at &&
+      new Date(tenant.trial_ends_at) < new Date()
+    ) {
+      throw new AppError(403, 'TRIAL_EXPIRED', 'El período de prueba expiró. Contactá al administrador.');
+    }
 
     const usuario = await runWithTenantContext(
       {
@@ -105,9 +115,11 @@ export class TenantAuthService {
       { id: tenant.id, slug: tenant.slug }
     );
 
+    const rememberMe = Boolean(payload.remember);
+
     return {
       token: generateTenantAccessToken(jwtPayload),
-      refreshToken: generateTenantRefreshToken(jwtPayload),
+      refreshToken: generateTenantRefreshToken(jwtPayload, rememberMe),
     };
   }
 

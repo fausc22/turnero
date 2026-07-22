@@ -1,57 +1,39 @@
-# Deployment overview — TuTurno (referencia futura)
+# Deployment overview — TuTurno
 
 | Campo | Valor |
 |-------|-------|
 | Estado doc | HECHO |
-| Última revisión | 2026-05-20 |
-| Relacionado con | [02-arquitectura/SUBDOMAINS-AND-ROUTING.md](../02-arquitectura/SUBDOMAINS-AND-ROUTING.md) |
+| Última revisión | 2026-07-22 |
+| Relacionado con | [PRODUCTION-RUNBOOK.md](./PRODUCTION-RUNBOOK.md), [STAGING-RUNBOOK.md](./STAGING-RUNBOOK.md) |
 
 ---
 
-## Alcance
+## Arquitectura prod
 
-Documento de referencia. **Objetivo actual del proyecto es funcionalidad local completa**, no deploy prod.
-
----
-
-## Arquitectura prod objetivo
-
-| Componente | URL |
-|------------|-----|
-| API | https://api.{BASE_DOMAIN} |
+| Componente | URL / proceso |
+|------------|----------------|
+| API | https://api.{BASE_DOMAIN} — `tuturno-api` (1 instancia) |
+| Scheduler | `tuturno-scheduler` (único; crons) |
+| Worker | `tuturno-worker` (notificaciones) |
 | Panel | https://panel.{BASE_DOMAIN} |
 | Super | https://admin.{BASE_DOMAIN} |
 | Cliente | https://{slug}.{BASE_DOMAIN} |
 
----
+Infra: VPS + Nginx/Caddy + PM2 + MySQL 8 + wildcard TLS.
 
-## Infra sugerida
+## Runbooks
 
-- VPS (patrón carrito/planificador)
-- Nginx o Caddy reverse proxy
-- PM2 procesos
-- MySQL 8 managed o local
-- Wildcard SSL `*.{BASE_DOMAIN}`
+1. [BASELINE.md](./BASELINE.md)
+2. [STAGING-RUNBOOK.md](./STAGING-RUNBOOK.md)
+3. [PRODUCTION-RUNBOOK.md](./PRODUCTION-RUNBOOK.md)
+4. [BACKUP-RESTORE.md](./BACKUP-RESTORE.md)
+5. [SMOKE-TESTS.md](./SMOKE-TESTS.md)
+6. [OBSERVABILITY.md](./OBSERVABILITY.md)
 
----
+## Guardrails
 
-## Variables prod
-
-- `NODE_ENV=production`
-- Secrets fuertes JWT (32+ chars random)
+- `LEGACY_API_ENABLED=false`
+- `RUN_CRONS_IN_API=false`
 - `DEV_UNLIMITED=false`
-- SMTP real
-- MP producción tokens por tenant
-
----
-
-## Referencias hermanas
-
-- carrito: `docs/DEPLOY-VPS-CADDY.md`, `PRODUCCION-PRIMEROS-PASOS.md`
-- planificador: `backend/docs/QA_ARRANQUE_LOCAL_Y_PRODUCCION.md`
-
----
-
-## Estado implementación
-
-Ver [STATUS.md](../STATUS.md).
+- Secrets JWT ≥ 32 chars (fail-fast)
+- Migraciones: `npm run migrate -w backend -- apply`

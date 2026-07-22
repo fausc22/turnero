@@ -4,7 +4,14 @@ import { findTenantBySlug } from '../repositories/admin/tenantRepository';
 import { normalizeSlug } from '../utils/slug';
 
 function getSlugFromRequest(req: Request): string {
-  return normalizeSlug(String(req.headers['x-tenant-slug'] || ''));
+  const header = normalizeSlug(String(req.headers['x-tenant-slug'] || ''));
+  if (header) return header;
+  // Public assets (<img>) cannot send custom headers — allow ?slug= only for GET asset
+  const path = req.originalUrl?.split('?')[0] || req.path || '';
+  if (req.method === 'GET' && /\/asset(\/|$)/.test(path)) {
+    return normalizeSlug(String(req.query.slug || ''));
+  }
+  return '';
 }
 
 export function resolveTenant(req: Request, res: Response, next: NextFunction): void {

@@ -112,9 +112,12 @@ CREATE TABLE IF NOT EXISTS `notification_jobs` (
   `last_error`    TEXT DEFAULT NULL,
   `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `processed_at`  DATETIME DEFAULT NULL,
+  `claimed_at`    DATETIME DEFAULT NULL,
+  `worker_id`     VARCHAR(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_status_created` (`status`, `created_at`),
-  KEY `idx_tenant` (`tenant_slug`)
+  KEY `idx_tenant` (`tenant_slug`),
+  KEY `idx_processing_claimed` (`status`, `claimed_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `whatsapp_session_status` (
@@ -126,5 +129,26 @@ CREATE TABLE IF NOT EXISTS `whatsapp_session_status` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO `whatsapp_session_status` (`id`, `connected`) VALUES (1, 0);
+
+CREATE TABLE IF NOT EXISTS `schema_migrations` (
+  `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `scope`        ENUM('admin','tenant') NOT NULL,
+  `tenant_slug`  VARCHAR(100) NOT NULL DEFAULT '',
+  `version`      VARCHAR(100) NOT NULL,
+  `checksum`     CHAR(64) NOT NULL,
+  `applied_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_scope_tenant_version` (`scope`, `tenant_slug`, `version`),
+  KEY `idx_version` (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `scheduler_heartbeats` (
+  `job_name`      VARCHAR(100) NOT NULL,
+  `last_run_at`   DATETIME DEFAULT NULL,
+  `last_success_at` DATETIME DEFAULT NULL,
+  `last_error`    TEXT DEFAULT NULL,
+  `updated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`job_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

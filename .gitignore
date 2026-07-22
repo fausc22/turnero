@@ -13,6 +13,10 @@ coverage/
 backend/logs/
 uploads/
 .baileys/
+backups/
+!backups/.gitkeep
 *.pem
 .vercel
 *.tsbuildinfo
+ops/backup/*.env
+ops/backup/local/

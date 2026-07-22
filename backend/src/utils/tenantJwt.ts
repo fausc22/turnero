@@ -1,4 +1,5 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { getEnv } from '../config/env';
 
 export interface TenantJwtPayload {
   sub: number;
@@ -7,13 +8,19 @@ export interface TenantJwtPayload {
   rol: string;
   email: string;
   type: 'access' | 'refresh';
+  remember?: boolean;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-change-me-min-32-chars!!';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-change-me-min-32!!';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
-const JWT_REFRESH_REMEMBER_EXPIRES_IN = process.env.JWT_REFRESH_REMEMBER_EXPIRES_IN || '30d';
+function secrets() {
+  const env = getEnv();
+  return {
+    JWT_SECRET: env.jwtSecret,
+    JWT_REFRESH_SECRET: env.jwtRefreshSecret,
+    JWT_EXPIRES_IN: env.JWT_EXPIRES_IN || '15m',
+    JWT_REFRESH_EXPIRES_IN: env.JWT_REFRESH_EXPIRES_IN || '7d',
+    JWT_REFRESH_REMEMBER_EXPIRES_IN: env.JWT_REFRESH_REMEMBER_EXPIRES_IN || '30d',
+  };
+}
 
 export function buildTenantPayload(
   usuario: { id: number; email: string; rol: string },
@@ -29,8 +36,9 @@ export function buildTenantPayload(
 }
 
 export function generateTenantAccessToken(payload: Omit<TenantJwtPayload, 'type'>): string {
-  return jwt.sign({ ...payload, type: 'access' }, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
+  const s = secrets();
+  return jwt.sign({ ...payload, type: 'access' }, s.JWT_SECRET, {
+    expiresIn: s.JWT_EXPIRES_IN,
   } as SignOptions);
 }
 
@@ -38,13 +46,14 @@ export function generateTenantRefreshToken(
   payload: Omit<TenantJwtPayload, 'type'>,
   rememberMe = false
 ): string {
-  return jwt.sign({ ...payload, type: 'refresh' }, JWT_REFRESH_SECRET, {
-    expiresIn: rememberMe ? JWT_REFRESH_REMEMBER_EXPIRES_IN : JWT_REFRESH_EXPIRES_IN,
+  const s = secrets();
+  return jwt.sign({ ...payload, type: 'refresh', remember: rememberMe }, s.JWT_REFRESH_SECRET, {
+    expiresIn: rememberMe ? s.JWT_REFRESH_REMEMBER_EXPIRES_IN : s.JWT_REFRESH_EXPIRES_IN,
   } as SignOptions);
 }
 
 export function verifyTenantAccessToken(token: string): TenantJwtPayload {
-  const decoded = jwt.verify(token, JWT_SECRET) as unknown as TenantJwtPayload;
+  const decoded = jwt.verify(token, secrets().JWT_SECRET) as unknown as TenantJwtPayload;
   if (decoded.type && decoded.type !== 'access') {
     throw new Error('WRONG_TOKEN_TYPE');
   }
@@ -57,7 +66,7 @@ export function verifyTenantAccessToken(token: string): TenantJwtPayload {
 /** Detecta access token tenant firmado con el secret correcto (p. ej. en rutas super). */
 export function isTenantAccessToken(token: string): boolean {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as unknown as TenantJwtPayload;
+    const decoded = jwt.verify(token, secrets().JWT_SECRET) as unknown as TenantJwtPayload;
     return decoded.type === 'access' && !!decoded.tenant_slug;
   } catch {
     return false;
@@ -65,7 +74,7 @@ export function isTenantAccessToken(token: string): boolean {
 }
 
 export function verifyTenantRefreshToken(token: string): TenantJwtPayload {
-  const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as unknown as TenantJwtPayload;
+  const decoded = jwt.verify(token, secrets().JWT_REFRESH_SECRET) as unknown as TenantJwtPayload;
   if (decoded.type !== 'refresh') {
     throw new Error('WRONG_TOKEN_TYPE');
   }

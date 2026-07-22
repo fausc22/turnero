@@ -59,4 +59,4 @@ export async function closeAdminPool(): Promise<void> {
   }
 }
 
-export { getAdminPool as adminPool };
+export { getAdminPool };

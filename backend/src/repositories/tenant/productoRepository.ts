@@ -18,8 +18,13 @@ export async function listActivosConStock(): Promise<ProductoRow[]> {
   );
 }
 
-export async function findById(id: number, conn?: PoolConnection): Promise<ProductoRow | null> {
-  const sql = `SELECT id, nombre, precio, stock_actual, activo, orden FROM productos WHERE id = ? AND activo = 1`;
+export async function findById(
+  id: number,
+  conn?: PoolConnection,
+  opts?: { forUpdate?: boolean }
+): Promise<ProductoRow | null> {
+  let sql = `SELECT id, nombre, precio, stock_actual, activo, orden FROM productos WHERE id = ? AND activo = 1`;
+  if (opts?.forUpdate) sql += ' FOR UPDATE';
   if (conn) {
     const [rows] = await conn.execute<(ProductoRow & RowDataPacket)[]>(sql, [id]);
     return rows[0] ?? null;

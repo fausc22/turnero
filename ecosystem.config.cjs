@@ -32,6 +32,8 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: '4013',
+        RUN_CRONS_IN_API: 'false',
+        LEGACY_API_ENABLED: 'false',
       },
     },
     {
@@ -86,6 +88,24 @@ module.exports = {
       kill_timeout: 8000,
       env: {
         NODE_ENV: 'production',
+      },
+    },
+    {
+      name: 'tuturno-scheduler',
+      cwd: path.join(root, 'backend'),
+      script: 'dist/jobs/scheduler.js',
+      interpreter: 'node',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_restarts: 15,
+      min_uptime: '10s',
+      max_memory_restart: '400M',
+      kill_timeout: 8000,
+      env: {
+        NODE_ENV: 'production',
+        RUN_CRONS_IN_API: 'false',
+        LEGACY_API_ENABLED: 'false',
       },
     },
     {

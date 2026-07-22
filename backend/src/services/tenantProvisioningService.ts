@@ -98,6 +98,9 @@ async function runProvisioning(
   const adminConn = await getAdminConnection();
   const rootConn = await mysql.createConnection(getRootConnectionConfig());
   let runId: number | null = null;
+  let dbCreated = false;
+  let dbNameCommitted = false;
+  let successMarked = false;
 
   try {
     runId = await runRepo.createProvisioningRun(tenant.id, requestedBy);
@@ -113,6 +116,7 @@ async function runProvisioning(
     await rootConn.query(
       `CREATE DATABASE \`${safeDbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
     );
+    dbCreated = true;
 
     await applySchemaToTenantDb(rootConn, safeDbName);
     await rootConn.query(`USE \`${safeDbName}\``);
@@ -138,20 +142,40 @@ async function runProvisioning(
       await domainRepo.createTenantDomain(tenant.id, domain, true);
     }
 
-    await tenantRepo.updateTenantDbName(tenant.id, safeDbName);
     await upsertFromTenantUser({ id: tenant.id, slug }, manager);
+
+    // Commit admin pointer only after tenant DB + index are ready
+    await tenantRepo.updateTenantDbName(tenant.id, safeDbName);
+    dbNameCommitted = true;
+
+    const { markTenantMigrationsApplied } = await import('./migrationService');
+    await markTenantMigrationsApplied(slug);
+
     await runRepo.markProvisioningSuccess(runId);
+    successMarked = true;
 
     const updated = await tenantRepo.findTenantById(tenant.id);
     if (!updated) throw new Error('Tenant no encontrado tras provisioning');
     return updated;
   } catch (error) {
-    try {
-      await rootConn.query(`DROP DATABASE IF EXISTS \`${safeDbName}\``);
-    } catch {
-      // ignore cleanup errors
+    // Never DROP after success was marked
+    if (!successMarked) {
+      if (dbNameCommitted) {
+        try {
+          await tenantRepo.updateTenantDbName(tenant.id, null);
+        } catch {
+          // ignore
+        }
+      }
+      if (dbCreated) {
+        try {
+          await rootConn.query(`DROP DATABASE IF EXISTS \`${safeDbName}\``);
+        } catch {
+          // ignore cleanup errors
+        }
+      }
     }
-    if (runId) {
+    if (runId && !successMarked) {
       await runRepo.markProvisioningError(
         runId,
         error instanceof Error ? error.message : 'Error desconocido'

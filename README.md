@@ -144,6 +144,23 @@ Variables útiles:
 
 Ver [docs/12-dev-local/TESTING-STRATEGY.md](./docs/12-dev-local/TESTING-STRATEGY.md).
 
+## Producción (cierre operativo)
+
+Documentos:
+
+- [docs/13-produccion/BASELINE.md](./docs/13-produccion/BASELINE.md)
+- [docs/13-produccion/BACKUP-RESTORE.md](./docs/13-produccion/BACKUP-RESTORE.md)
+- [docs/13-produccion/OBSERVABILITY.md](./docs/13-produccion/OBSERVABILITY.md)
+- [docs/13-produccion/STAGING-RUNBOOK.md](./docs/13-produccion/STAGING-RUNBOOK.md)
+- [docs/13-produccion/PRODUCTION-RUNBOOK.md](./docs/13-produccion/PRODUCTION-RUNBOOK.md)
+- [docs/13-produccion/SMOKE-TESTS.md](./docs/13-produccion/SMOKE-TESTS.md)
+
+```bash
+npm run verify:baseline
+npm run migrate -w backend -- plan
+pm2 start ecosystem.config.cjs   # api, web, panel, admin, worker, scheduler
+```
+
 ## Por dónde empezar
 
 1. Leer [docs/README.md](./docs/README.md)

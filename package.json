@@ -1,6 +1,10 @@
 {
   "name": "tuturno",
   "private": true,
+  "engines": {
+    "node": ">=20 <25",
+    "npm": ">=10"
+  },
   "workspaces": [
     "backend",
     "frontend",
@@ -11,12 +15,20 @@
   "scripts": {
     "dev": "concurrently -n api,web,panel,admin -c blue,green,yellow,magenta \"npm run dev -w backend\" \"npm run dev -w frontend\" \"npm run dev -w panel\" \"npm run dev -w panel-super\"",
     "test": "npm run test -w backend",
+    "test:unit": "npm run test:unit -w backend",
+    "test:integration": "npm run test:integration -w backend",
+    "test:http": "npm run test:http -w backend",
     "test:e2e": "npm run test -w e2e",
     "test:all": "npm run test && npm run test:e2e",
     "setup:admin": "npm run setup:admin -w backend",
     "setup:db": "npm run setup:db -w backend",
     "type-check": "npm run type-check -w backend",
-    "build": "npm run build -w backend && npm run build -w frontend && npm run build -w panel && npm run build -w panel-super"
+    "build": "npm run build -w backend && npm run build -w frontend && npm run build -w panel && npm run build -w panel-super",
+    "audit:prod": "npm audit --omit=dev --workspaces",
+    "verify:baseline": "./scripts/verify-baseline.sh",
+    "migrate": "npm run migrate -w backend",
+    "worker:notifications": "npm run worker:notifications -w backend",
+    "scheduler": "npm run scheduler -w backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

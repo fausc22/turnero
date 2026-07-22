@@ -3,13 +3,15 @@
 import Link from 'next/link';
 import { useTenant } from '@/context/TenantContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getTenantSlug } from '@/lib/tenant-client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://api.localhost:4013';
 
 export function TenantHeader() {
   const { config, isLoading } = useTenant();
   const nombre = config?.nombre ?? 'Tu comercio';
-  const logoUrl = `${API_URL}/api/public/asset/logo`;
+  const slug = getTenantSlug();
+  const logoUrl = `${API_URL}/api/public/asset/logo${slug ? `?slug=${encodeURIComponent(slug)}` : ''}`;
 
   return (
     <header className="border-b border-border bg-[var(--bg-elevated)]/80 backdrop-blur">

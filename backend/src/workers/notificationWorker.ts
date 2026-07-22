@@ -120,7 +120,8 @@ async function processJob(job: jobRepo.NotificationJobRow): Promise<void> {
 }
 
 async function pollJobs(): Promise<void> {
-  const jobs = await jobRepo.claimNext(1);
+  const workerId = process.env.WORKER_ID || `worker-${process.pid}`;
+  const jobs = await jobRepo.claimNext(1, workerId);
   for (const job of jobs) {
     if (shuttingDown) {
       await jobRepo.resetToPending(job.id);

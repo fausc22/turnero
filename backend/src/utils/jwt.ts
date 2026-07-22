@@ -1,36 +1,43 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { JwtPayload } from '../types';
+import { getEnv } from '../config/env';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh_secret';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+function secrets() {
+  const env = getEnv();
+  return {
+    JWT_SECRET: env.jwtSecret,
+    JWT_REFRESH_SECRET: env.jwtRefreshSecret,
+    JWT_EXPIRES_IN: env.JWT_EXPIRES_IN || '1h',
+    JWT_REFRESH_EXPIRES_IN: env.JWT_REFRESH_EXPIRES_IN || '7d',
+  };
+}
 
 export function generateToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
+  const s = secrets();
+  return jwt.sign(payload, s.JWT_SECRET, {
+    expiresIn: s.JWT_EXPIRES_IN,
   } as SignOptions);
 }
 
 export function generateRefreshToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, {
-    expiresIn: JWT_REFRESH_EXPIRES_IN,
+  const s = secrets();
+  return jwt.sign(payload, s.JWT_REFRESH_SECRET, {
+    expiresIn: s.JWT_REFRESH_EXPIRES_IN,
   } as SignOptions);
 }
 
 export function verifyToken(token: string): JwtPayload {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
-  } catch (error) {
+    return jwt.verify(token, secrets().JWT_SECRET) as JwtPayload;
+  } catch {
     throw new Error('Token inválido o expirado');
   }
 }
 
 export function verifyRefreshToken(token: string): JwtPayload {
   try {
-    return jwt.verify(token, JWT_REFRESH_SECRET) as JwtPayload;
-  } catch (error) {
+    return jwt.verify(token, secrets().JWT_REFRESH_SECRET) as JwtPayload;
+  } catch {
     throw new Error('Refresh token inválido o expirado');
   }
 }
-

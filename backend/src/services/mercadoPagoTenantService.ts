@@ -197,6 +197,28 @@ async function applyPaymentResult(payment: MpPayment, turnoId: number, tenantSlu
   const existing = await pagoRepo.findByIdempotencyKey(idempotencyKey);
   if (existing) return;
 
+  if (payment.status === 'approved') {
+    const politicas = await politicasRepo.getPoliticas();
+    if (!politicas) {
+      throw new AppError(500, 'CONFIG_ERROR', 'Políticas no configuradas');
+    }
+    const expected = calcMontoPago(
+      politicas.modo_pago,
+      Number(turno.precio_total),
+      politicas.seña_porcentaje,
+      politicas.seña_monto_fijo
+    );
+    const paid = Number(payment.transaction_amount);
+    // Allow 1 cent rounding tolerance
+    if (Math.abs(paid - expected) > 0.01) {
+      throw new AppError(
+        400,
+        'AMOUNT_MISMATCH',
+        `Monto de pago ${paid} no coincide con el esperado ${expected}`
+      );
+    }
+  }
+
   let pagoEstado: string;
   if (payment.status === 'approved') pagoEstado = 'PAGADO';
   else if (payment.status === 'pending' || payment.status === 'in_process') pagoEstado = 'PENDIENTE';
